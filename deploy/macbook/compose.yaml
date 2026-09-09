@@ -1,0 +1,52 @@
+name: txtextcontrol-macbook
+services:
+  mcp:
+    build: ./publish/mcp
+    platform: linux/amd64
+    user: "${LOCAL_UID:?Run setup.sh}:${LOCAL_GID:?Run setup.sh}"
+    init: true
+    restart: unless-stopped
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    ports: ["127.0.0.1:58506:8081"]
+    env_file: ["${STATE_DIR:?Run setup.sh}/mcp.env"]
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      HOME: /data
+      Kestrel__Certificates__Default__Path: /run/tls/server.pem
+      Kestrel__Certificates__Default__KeyPath: /run/tls/server.key
+      McpServer__BasePath: /data/documents
+      McpServiceAuthentication__Required: "true"
+      DocumentWorkerPool__WorkerCount: "1"
+    volumes:
+      - "${STATE_DIR}/tls/server.pem:/run/tls/server.pem:ro"
+      - "${STATE_DIR}/tls/server.key:/run/tls/server.key:ro"
+      - "${STATE_DIR}/mcp:/data"
+      - "${STATE_DIR}/mcp/appsettings.json:/app/appsettings.json"
+  web:
+    build: ./publish/web
+    platform: linux/amd64
+    user: "${LOCAL_UID}:${LOCAL_GID}"
+    init: true
+    restart: unless-stopped
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    ports: ["127.0.0.1:8443:8081"]
+    env_file: ["${STATE_DIR}/web.env"]
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      HOME: /app/App_Data
+      AllowedHosts: localhost
+      Kestrel__Certificates__Default__Path: /run/tls/server.pem
+      Kestrel__Certificates__Default__KeyPath: /run/tls/server.key
+      SSL_CERT_FILE: /run/tls/rootCA.pem
+      RemoteIntegration__ServiceUrl: https://host.docker.internal:5081/api/
+      RemoteIntegration__AllowedServiceUrls__0: https://host.docker.internal:5081/api/
+      DeploymentAuthentication__Enabled: "true"
+      DeploymentAuthentication__Username: admin
+    volumes:
+      - "${STATE_DIR}/tls/server.pem:/run/tls/server.pem:ro"
+      - "${STATE_DIR}/tls/server.key:/run/tls/server.key:ro"
+      - "${STATE_DIR}/tls/rootCA.pem:/run/tls/rootCA.pem:ro"
+      - "${STATE_DIR}/web/App_Data:/app/App_Data"
+      - "${STATE_DIR}/web/artifacts:/app/artifacts"

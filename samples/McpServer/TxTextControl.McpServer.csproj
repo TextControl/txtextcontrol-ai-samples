@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>TxTextControl.McpServer</AssemblyName>
+    <RootNamespace>TxTextControl.McpServer</RootNamespace>
+    <!-- The host's restore identity must differ from the library package ID. -->
+    <PackageId>TXTextControl.McpServer.Host</PackageId>
+    <UserSecretsId>TXTextControl-AI-Samples-McpServer</UserSecretsId>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="TXTextControl.AI.McpServer" />
+  </ItemGroup>
+</Project>

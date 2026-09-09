@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <UserSecretsId>TXTextControl-AI-Samples-Service</UserSecretsId>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="TXTextControl.AI.AspNetCore" />
+    <!-- Security baseline also applies when restoring the original beta.1 Knowledge package. -->
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Remove="App_Data/**;artifacts/**;Models/**" />
+    <None Remove="App_Data/**;artifacts/**;Models/**" />
+  </ItemGroup>
+</Project>

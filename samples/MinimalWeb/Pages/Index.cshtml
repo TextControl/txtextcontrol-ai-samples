@@ -1,0 +1,41 @@
+@page
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8" /><meta name="viewport" content="width=device-width" /><title>Minimal document AI chat</title></head>
+<body>
+    <h1>Document AI chat</h1>
+    <p>Configure LocalAI in appsettings.json with a model and your MCP endpoint before chatting.</p>
+    <form id="chat"><label for="message">Ask or create a document</label><input id="message" required /><button>Send</button></form>
+    <p id="progress" role="status"></p>
+    <pre id="answer" style="white-space:pre-wrap"></pre>
+    <div id="downloads"></div>
+    <script src="~/_content/TXTextControl.AI.AspNetCore/client.js"></script>
+    <script>
+        const client = new TXTextControlAI.Client({ apiBaseUrl: '@Url.Content("~/api")' });
+        const form = document.querySelector('#chat');
+        form.addEventListener('submit', async event => {
+            event.preventDefault();
+            const button = form.querySelector('button');
+            button.disabled = true;
+            const downloads = document.querySelector('#downloads');
+            downloads.replaceChildren();
+            try {
+                const result = await client.chat(document.querySelector('#message').value, update => {
+                    document.querySelector('#progress').textContent = update.message || update.type;
+                });
+                document.querySelector('#answer').textContent = result.text;
+                for (const artifact of result.artifacts || []) {
+                    const link = document.createElement('a');
+                    link.href = client.url(artifact.downloadUrl);
+                    link.textContent = `Download ${artifact.fileName}`;
+                    downloads.append(link, document.createElement('br'));
+                }
+                document.querySelector('#message').value = '';
+            } catch (error) {
+                document.querySelector('#progress').textContent = error.message;
+            } finally { button.disabled = false; }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+FROM mcr.microsoft.com/dotnet/aspnet:8.0-noble
+RUN apt-get update && apt-get install -y --no-install-recommends libgomp1 fontconfig \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+COPY . /app/
+ENV ASPNETCORE_URLS=https://+:8081
+EXPOSE 8081
+ENTRYPOINT ["dotnet", "/app/TXTextControl.AI.Web.dll"]

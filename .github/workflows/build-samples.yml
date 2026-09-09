@@ -1,0 +1,39 @@
+name: Build sample consumers
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      NUGET_PACKAGES: ${{ runner.temp }}/sample-nuget-packages
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+      - name: Public-feed restore, audit, build and publish
+        shell: pwsh
+        run: ./scripts/verify-samples.ps1 -ReleaseGate
+      - name: Check shell syntax
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          for script in scripts/*.sh deploy/macbook/*.sh; do bash -n "$script"; done
+      - name: Audit and cross-publish deployment targets
+        shell: pwsh
+        run: ./scripts/New-MacBookBundle.ps1 -ReleaseGate
+      - name: Validate Compose template
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          docker compose -f deploy/macbook/compose.yaml config --no-interpolate --no-env-resolution --quiet

@@ -1,0 +1,318 @@
+@page
+@inject Microsoft.Extensions.Configuration.IConfiguration Configuration
+@using TXTextControl.Web
+@using TXTextControl.Web.MVC
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@{
+    var workspaceOptions = new TXTextControl.AI.Web.AiWorkspaceOptions
+    {
+        Title = "TX Local Document AI",
+        DefaultSampleName = "Mutual-NDA.rtf",
+        ApiBaseUrl = "~/api",
+        ShowRuntimeSettings = true
+    };
+    ViewData["Title"] = workspaceOptions.Title;
+}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@ViewData["Title"]</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&amp;display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="~/css/app.css" asp-append-version="true" />
+    @if (!string.IsNullOrWhiteSpace(workspaceOptions.StylesheetUrl))
+    {
+        <link rel="stylesheet" href="@Url.Content(workspaceOptions.StylesheetUrl)" />
+    }
+</head>
+<body>
+    <div class="ambient ambient-one"></div>
+    <div class="ambient ambient-two"></div>
+    <main class="app-shell">
+        <header class="topbar">
+            <a class="brand" href="/" aria-label="TX Local Document AI home">
+                <img class="brand-logo" src="@Url.Content(workspaceOptions.LogoUrl)" alt="TX Text Control AI" />
+            </a>
+            <nav class="mode-tabs" aria-label="Workspace">
+                <button class="mode-tab is-active" data-tab="chat" type="button">Chat</button>
+                <button class="mode-tab" data-tab="document" type="button">Document Studio</button>
+                <button class="mode-tab" data-tab="knowledge" type="button">Knowledge</button>
+                @if (workspaceOptions.ShowRuntimeSettings)
+                {
+                    <button class="mode-tab" data-tab="runtime" type="button">Runtime</button>
+                }
+            </nav>
+            <div class="runtime-pill" data-runtime-pill data-state="offline">
+                <span></span><strong data-runtime-short>Checking runtime</strong>
+            </div>
+        </header>
+
+        <section class="knowledge-scope" data-knowledge-scope hidden aria-label="Reference knowledge for the next request">
+            <label>Reference knowledge <select data-knowledge-select><option value="">None · current workflow only</option></select></label>
+            <label>Approved source <select data-knowledge-version><option value="">All active sources</option></select></label>
+            <label class="knowledge-approval"><input type="checkbox" data-knowledge-edit /> Allow explicitly requested document changes</label>
+            <small data-knowledge-context>Reference sources never replace the working document.</small>
+        </section>
+        <section class="workspace" data-panel="knowledge" hidden>
+            <div class="knowledge-page glass-card">
+                <header><p class="eyebrow">PRIVATE REFERENCE DOCUMENTS</p><h1>Knowledge</h1><p>Index on the AI host, preview supporting passages, then ask a cited question in Chat or Document Studio. Rich documents are extracted by the connected MCP server; TXT and Markdown stay on the AI host.</p></header>
+                <p data-knowledge-status role="status">Checking knowledge availability…</p>
+                <div class="knowledge-grid">
+                    <section class="knowledge-card"><h2>Collections and sources</h2>
+                        <form data-knowledge-create><label>Collection name<input name="name" maxlength="160" required placeholder="Approved company policies" /></label><button class="primary-button">Create collection</button></form>
+                        <label>Collection<select data-knowledge-admin-select></select></label>
+                        <div class="knowledge-actions"><button class="secondary-button" data-knowledge-rename type="button" disabled>Rename collection</button><button class="secondary-button knowledge-danger" data-knowledge-delete type="button" disabled>Delete collection</button></div>
+                        <label>Reference documents<input data-knowledge-upload type="file" multiple accept=".txt,.md,.markdown,.tx,.rtf,.docx,.html,.htm,.pdf" /></label>
+                        <small>Up to 32 MB per file, subject to MCP/proxy limits. DOCX, RTF, PDF, TX and HTML require the updated MCP extraction endpoint. Uploading the same filename creates a replacement version. Scanned PDFs require OCR before upload.</small>
+                        <button class="secondary-button" data-knowledge-refresh type="button">Refresh jobs and sources</button>
+                        <div data-knowledge-jobs></div><div data-knowledge-sources></div>
+                    </section>
+                    <section class="knowledge-card"><h2>Preview evidence</h2>
+                        <p>Optionally test search for the selected collection. You can also select it directly in Chat or Document Studio and ask a question.</p>
+                        <form data-knowledge-search><label>Question<input name="query" required maxlength="4000" placeholder="What are Riverbend’s payment terms?" /></label>
+                        <label>Retrieval mode<select name="mode"><option value="0">Automatic</option><option value="1">Keyword</option><option value="2">Semantic</option><option value="3">Hybrid</option></select></label>
+                        <button class="primary-button">Search references</button></form><div data-knowledge-results></div>
+                        <p>Search returns ranked evidence, not an exhaustive list or financial aggregation. Sources may disagree.</p>
+                    </section>
+                </div>
+                <details class="knowledge-card knowledge-global">
+                    <summary>Global knowledge settings <span>Optional · applies to all collections</span></summary>
+                    <section><h2>Local embedding model</h2>
+                        <p>Keyword search works without this setting. Configure an embedding model once to add semantic search across all collections. This is independent of the selected collection and separate from your chat model.</p>
+                        <p>No model download and no chat-model replacement. Choose a retrieval embedding GGUF, not a chat model.</p>
+                        <form data-knowledge-embedding><label>Application-owned GGUF<select name="modelFileName"><option value="">Keyword only</option></select></label>
+                        <div class="knowledge-grid"><label>Dimensions<input name="dimensions" type="number" min="1" max="65536" value="384" required /></label><label>Pooling<select name="pooling"><option>mean</option><option>cls</option><option>last</option></select></label></div>
+                        <label>Query prefix<input name="queryPrefix" maxlength="1000" placeholder="Model-specific, e.g. query: " /></label><label>Document prefix<input name="documentPrefix" maxlength="1000" placeholder="Model-specific, e.g. passage: " /></label>
+                        <button class="primary-button">Save embedding configuration</button></form>
+                        <small>Changes require a host restart and reindexing. The application never restarts itself. The embedding runtime uses its own CPU process by default.</small>
+                        <p data-knowledge-embedding-status role="status"></p>
+                    </section>
+                </details>
+            </div>
+        </section>
+        <section class="workspace is-active" data-panel="chat">
+            <div class="chat-layout">
+                <section class="chat-card agent-panel glass-card" data-chat-drop-zone>
+                    <div class="chat-drop-overlay" data-chat-drop-overlay hidden>
+                        <span class="chat-drop-icon" aria-hidden="true">↓</span>
+                        <strong>Drop your document here</strong>
+                        <small>TX, RTF, DOCX, HTML, PDF, Markdown, or text</small>
+                    </div>
+                    <div class="agent-header">
+                        <div><span class="eyebrow">DOCUMENT AGENT</span><h2>AI Chat</h2></div>
+                        <div class="agent-header-actions">
+                            <span class="agent-runtime"><i></i><span data-model-label>No model loaded</span> · <span data-tool-label>Waiting for MCP</span></span>
+                            <button class="new-chat-button" data-reset-chat type="button"><span aria-hidden="true">＋</span> New chat</button>
+                        </div>
+                    </div>
+                    <div class="messages" data-messages aria-live="polite">
+                        <div class="agent-welcome">
+                            <div class="welcome-mark">TX</div>
+                            <h1>
+                                Your documents. Your AI. Your control. Let’s get to work.
+                            </h1>
+                            <p>Create a document, attach one to ask questions, or request precise edits through your local document agent.</p>
+                        </div>
+                    </div>
+                    <section class="quick-actions-panel chat-quick-actions">
+                        <div class="quick-actions-heading"><span>QUICK ACTIONS</span><span class="category-pill" data-chat-category>Start something new</span></div>
+                        <div class="quick-action-rail" data-chat-quick-actions aria-label="Suggested prompts">
+                            <button class="quick-action-card" type="button" data-prompt="Create a one-page project proposal with a heading, executive summary, three benefits, and next steps. Save it as PDF."><span>✦</span><strong>Project proposal</strong><small>Create a polished one-page proposal.</small></button>
+                            <button class="quick-action-card" type="button" data-prompt="Create a professional invoice with three line items, subtotal, tax, total, and payment terms. Save it as PDF."><span>✦</span><strong>Invoice</strong><small>Generate a professional invoice.</small></button>
+                            <button class="quick-action-card" type="button" data-prompt="Create a meeting agenda for a product launch review with five agenda items and an action-items table."><span>✦</span><strong>Meeting agenda</strong><small>Plan a focused meeting.</small></button>
+                        </div>
+                    </section>
+                    <div class="chat-bottom">
+                    <div class="chat-attachment" data-chat-attachment hidden>
+                        <span class="chat-attachment-type" data-chat-attachment-type>DOC</span>
+                        <span class="chat-attachment-copy"><strong data-chat-attachment-name></strong><small data-chat-attachment-meta></small></span>
+                        <button data-remove-chat-attachment type="button" aria-label="Remove attached document" title="Remove attached document">×</button>
+                    </div>
+                    <form class="composer" data-chat-form>
+                        <label class="chat-upload-button" aria-label="Attach a document" title="Attach a document">
+                            <input data-chat-file-input type="file" accept=".tx,.rtf,.docx,.html,.htm,.pdf,.md,.txt" />
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 12.5 15 6a3.54 3.54 0 0 1 5 5l-8.5 8.5a5.3 5.3 0 0 1-7.5-7.5L12 4" /></svg>
+                        </label>
+                        <textarea data-chat-input rows="2" placeholder="Create a document, attach one, or ask about the current document…" aria-label="Message"></textarea>
+                        <button class="send-button" type="submit" aria-label="Send message" title="Send message"><span aria-hidden="true">↑</span></button>
+                    </form>
+                    <small class="composer-note">Attach TX, RTF, DOCX, HTML, PDF, Markdown, or text · Enter to send</small>
+                    </div>
+                </section>
+            </div>
+        </section>
+
+        <section class="workspace" data-panel="document" hidden>
+            <div class="document-toolbar glass-card">
+                <div><span class="eyebrow">DOCUMENT STUDIO</span><strong data-document-name>Untitled document</strong></div>
+                <div class="document-loaders">
+                    <select data-sample-select aria-label="Sample document"><option value="">Choose a sample…</option></select>
+                    <button class="secondary-button" data-load-sample type="button">Load sample</button>
+                    <label class="secondary-button upload-button">Open local file<input data-file-input type="file" accept=".tx,.rtf,.doc,.docx,.html,.htm,.pdf" /></label>
+                </div>
+            </div>
+            <div class="document-grid">
+                <section class="editor-card glass-card">
+                    <div class="editor-host">
+                        @Html.TXTextControl().TextControl(settings => { settings.Dock = DockStyle.Fill; }).Render()
+                    </div>
+                </section>
+                <aside class="assistant-card studio-agent glass-card">
+                    <div class="agent-header studio-agent-header">
+                        <div><span class="eyebrow">DOCUMENT AGENT</span><h2>AI Chat</h2></div>
+                        <button class="new-chat-button compact" data-reset-document-chat type="button"><span aria-hidden="true">＋</span> New chat</button>
+                    </div>
+                    <section class="quick-actions-panel studio-quick-actions">
+                        <div class="quick-actions-heading"><span>QUICK ACTIONS</span><span class="category-pill" data-document-category>Analyzing document…</span></div>
+                        <div class="quick-action-rail" data-document-quick-actions>
+                            <button class="quick-action-card" data-document-action="summary" type="button"><span>≡</span><strong>Create summary</strong><small>Extract the key points.</small></button>
+                        </div>
+                    </section>
+
+                    <section class="selection-box" data-selection-panel data-active="false">
+                        <div class="selection-heading"><span class="action-icon">✦</span><span><strong>Rephrase selection</strong><small data-selection-status>Select text inside the editor to activate.</small></span></div>
+                        <select data-rewrite-tone aria-label="Rewrite tone" disabled>
+                            <option value="clear and concise">Clear &amp; concise</option>
+                            <option value="professional">Professional</option>
+                            <option value="friendly">Friendly</option>
+                            <option value="confident and persuasive">Persuasive</option>
+                        </select>
+                        <button class="secondary-button wide" data-document-action="rewrite" type="button" disabled>Replace selected text</button>
+                    </section>
+
+                    <div class="document-chat-shell">
+                        <div class="document-messages" data-document-messages aria-live="polite">
+                            <div class="agent-welcome compact">
+                                <div class="welcome-mark">TX</div>
+                                <h3>Work with this document</h3>
+                                <p>Ask a question, request an edit, or choose a suggested action.</p>
+                            </div>
+                        </div>
+                        <div class="document-composer-area">
+                            <div class="document-composer">
+                                <textarea id="documentQuestion" data-document-question rows="2" placeholder="Ask about or edit this document…" title="Press Enter to send. Press Shift+Enter for a new line."></textarea>
+                                <button class="send-button" data-document-action="question" type="button" aria-label="Send document request" title="Send document request"><span aria-hidden="true">↑</span></button>
+                            </div>
+                            <small class="document-composer-note">Enter to send · Shift+Enter for a new line</small>
+                        </div>
+                    </div>
+                </aside>
+            </div>
+        </section>
+
+        <section class="workspace" data-panel="runtime" hidden>
+            <div class="runtime-layout">
+                <section class="settings-card glass-card">
+                    <div class="panel-header"><div><span class="eyebrow">ADMIN</span><h1>Runtime settings</h1><p>Connect the document server, select an application-owned GGUF, and tune generation behavior.</p></div></div>
+                    <form data-connection-form data-endpoint="@Url.Content("~/integration-connection")" class="runtime-installation">
+                        <div><span class="eyebrow">AI HOST</span><h2>Integration service</h2></div>
+                        <p>Use the AI engine in this website, or connect to a separately hosted AI service. The same Runtime and Knowledge screens manage the selected host.</p>
+                        <div class="field"><label for="ai-service-url">AI service API URL</label><input id="ai-service-url" name="serviceUrl" type="url" placeholder="https://ai.example.com/api/ (blank for local)" /></div>
+                        <small>Only server-approved HTTPS URLs are accepted. Credentials are configured on the website server, never in this form. Saving requires a website restart.</small>
+                        <p data-connection-status role="status">Checking AI host…</p>
+                        <div class="runtime-install-buttons"><button type="submit" class="primary-button">Save connection</button>
+                        <button type="button" data-connection-test class="secondary-button">Test connection</button></div>
+                    </form>
+                    <form data-runtime-form>
+                        <section class="runtime-installation full" data-runtime-installation aria-label="Inference runtime installation">
+                            <div><span class="eyebrow">INFERENCE ENGINE</span><h2>Runtime installation</h2></div>
+                            <p data-install-summary>Checking installed runtimes…</p>
+                            <details data-download-settings>
+                                <summary>Engine release and download source</summary>
+                                <div class="field"><label for="runtimeRelease">Release</label><input id="runtimeRelease" data-download-version type="text" maxlength="64" placeholder="b10621" /></div>
+                                <div class="field"><label for="runtimeDownloadUrl">Download base URL (HTTPS)</label><input id="runtimeDownloadUrl" data-download-url type="url" placeholder="https://github.com/ggml-org/llama.cpp/releases/download" /></div>
+                                <p class="runtime-install-note">Archives are downloaded from base URL / release / filename. A mirror of the bundled release can keep the asset list empty. For another release, supply every required archive with its platform, backend, filename, byte size, and SHA-256 hash. No automatic “latest” updates.</p>
+                                <div class="field"><label for="runtimeDownloadAssets">Custom asset manifest (JSON array)</label><textarea id="runtimeDownloadAssets" data-download-assets rows="8" spellcheck="false" placeholder="[]"></textarea></div>
+                                <p class="runtime-install-note" data-download-persistence></p>
+                                <div class="runtime-install-buttons"><button class="primary-button" type="button" data-apply-download disabled>Apply download settings</button></div>
+                            </details>
+                            <div class="field"><label for="runtimeDownloadBackend">Runtime to install</label><select id="runtimeDownloadBackend" data-install-backend></select></div>
+                            <p class="runtime-install-note" data-install-limitation></p>
+                            <progress data-install-progress max="1" value="0" aria-label="Runtime installation progress" hidden></progress>
+                            <p data-install-stage role="status" aria-live="polite"></p>
+                            <div class="runtime-install-buttons">
+                                <button class="primary-button" type="button" data-install-runtime>Install selected runtime</button>
+                                <button class="secondary-button" type="button" data-cancel-install hidden>Cancel</button>
+                                <button class="secondary-button" type="button" data-refresh-install>Refresh</button>
+                                <button class="secondary-button" type="button" data-unload-runtime>Unload model</button>
+                            </div>
+                            <ul class="runtime-installed-list" data-installed-runtimes></ul>
+                            <details><summary>Installation details</summary><p data-install-directory></p>
+                                <p>Installation downloads a pinned runtime from the configured HTTPS source and verifies its size and SHA-256 hash. No models or drivers are downloaded. Custom engine releases require compatibility testing by your administrator.</p>
+                                <p>GPU/system-library requirements and upstream licenses apply. Administration in this sample is restricted to a same-origin loopback connection.</p>
+                            </details>
+                        </section>
+                        <div class="field full">
+                            <label for="mcpEndpoint">MCP server endpoint</label>
+                            <div class="mcp-endpoint-row">
+                                <input id="mcpEndpoint" name="mcpEndpoint" type="url" value="http://127.0.0.1:5000/mcp" placeholder="http://127.0.0.1:5000/mcp" required />
+                                <button class="secondary-button" type="button" data-test-mcp>Test connection</button>
+                            </div>
+                            <small class="connection-result" data-mcp-test-result>Enter a Streamable HTTP MCP endpoint, then test it before applying.</small>
+                        </div>
+                        <label class="toggle"><input name="enableMcp" type="checkbox" checked /><span></span><div><strong>TX Text Control Document MCP</strong><small>Turn off to load and use the local model without an MCP server.</small></div></label>
+                        <div class="field full"><label for="modelFile">Model</label><select id="modelFile" name="modelFile" required><option value="">No models found</option></select><small>Scanned from this web application’s Models directory.</small></div>
+                        <div class="field full range-field"><label for="temperature">Warmth <output data-temperature-output>0.60</output></label><input id="temperature" name="temperature" type="range" min="0" max="2" step="0.05" value="0.6" /><div class="range-labels"><span>Precise</span><span>Creative</span></div></div>
+                        <div class="settings-grid">
+                            <div class="field"><label for="hardwareBackend">Inference backend</label><select id="hardwareBackend" name="hardwareBackend"><option value="0">Auto (installed runtimes)</option><option value="1">CPU</option><option value="2">CUDA</option><option value="3">Vulkan</option></select></div>
+                            <div class="field"><label for="maxOutputTokens">Max output tokens</label><input id="maxOutputTokens" name="maxOutputTokens" type="number" min="64" max="8192" value="1024" /></div>
+                            <div class="field"><label for="contextSize">Context size</label><input id="contextSize" name="contextSize" type="number" min="512" step="512" value="32768" /></div>
+                            <div class="field"><label for="topK">Top K</label><input id="topK" name="topK" type="number" min="1" max="200" value="40" /></div>
+                            <div class="field"><label for="topP">Top P</label><input id="topP" name="topP" type="number" min="0" max="1" step="0.01" value="0.95" /></div>
+                            <div class="field"><label for="gpuLayers">GPU layers</label><input id="gpuLayers" name="gpuLayers" type="number" min="-1" value="-1" /><small>-1 fits automatically</small></div>
+                            <div class="field"><label for="threads">CPU threads</label><input id="threads" name="threads" type="number" min="1" placeholder="Automatic" /></div>
+                            <div class="field"><label for="frequencyPenalty">Frequency penalty</label><input id="frequencyPenalty" name="frequencyPenalty" type="number" min="-2" max="2" step="0.1" placeholder="Runtime default" /></div>
+                            <div class="field"><label for="presencePenalty">Presence penalty</label><input id="presencePenalty" name="presencePenalty" type="number" min="-2" max="2" step="0.1" placeholder="Runtime default" /></div>
+                            <div class="field"><label for="seed">Seed</label><input id="seed" name="seed" type="number" placeholder="Random" /></div>
+                            <div class="field"><label for="flashAttention">Flash attention</label><select id="flashAttention" name="flashAttention"><option value="">Automatic</option><option value="true">On</option><option value="false">Off</option></select></div>
+                        </div>
+                        <label class="toggle"><input name="enableReasoning" type="checkbox" /><span></span><div><strong>Reasoning mode</strong><small>Enable only for models with reasoning support.</small></div></label>
+                        <button class="primary-button configure-button" type="submit"><span>Apply and load model</span></button>
+                    </form>
+                </section>
+                <aside class="status-card glass-card">
+                    <span class="eyebrow">LIVE STATUS</span>
+                    <div class="status-orb" data-status-orb><span></span></div>
+                    <h2 data-status-heading>Runtime offline</h2>
+                    <p data-status-detail>Place a GGUF in Models and load it.</p>
+                    <dl>
+                        <div><dt>Model</dt><dd data-status-model>—</dd></div>
+                        <div><dt>Engine</dt><dd data-status-engine>—</dd></div>
+                        <div><dt>Hardware</dt><dd data-status-hardware>—</dd></div>
+                        <div><dt>GPU layers</dt><dd data-status-layers>—</dd></div>
+                        <div><dt>MCP endpoint</dt><dd data-status-mcp-endpoint>—</dd></div>
+                        <div><dt>MCP tools</dt><dd data-status-tools>0</dd></div>
+                    </dl>
+                    <div class="privacy-note"><span>⌁</span><p><strong>Local processing</strong>Model inference stays on this machine. Knowledge references are indexed locally with TX Text Control. Working-document operations use the configured MCP server.</p></div>
+                </aside>
+            </div>
+        </section>
+    </main>
+    <footer class="site-footer">
+        <div class="footer-inner">
+            <div class="footer-company">
+                <strong>Text Control</strong>
+                <span>Document processing technology for developers.</span>
+            </div>
+            <nav class="footer-links" aria-label="Text Control resources">
+                <a href="https://www.textcontrol.com/" target="_blank" rel="noreferrer">Text Control</a>
+                <a href="https://docs.textcontrol.com/textcontrol/asp-dotnet/" target="_blank" rel="noreferrer">Documentation</a>
+                <a href="https://www.textcontrol.com/products/asp-dotnet/tx-text-control-dotnet-server/overview/" target="_blank" rel="noreferrer">Product overview</a>
+                <a class="footer-cta" href="https://www.textcontrol.com/products/asp-dotnet/tx-text-control-dotnet-server/downloads/#tab_trial" target="_blank" rel="noreferrer">Try TX Text Control <span aria-hidden="true">›</span></a>
+            </nav>
+            <small>© @DateTime.UtcNow.Year Text Control GmbH</small>
+        </div>
+    </footer>
+    <div class="toast" data-toast role="status" aria-live="polite"></div>
+    <script>window.textControlAIWorkspace = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(new { apiBaseUrl = Url.Content(workspaceOptions.ApiBaseUrl), defaultSampleName = workspaceOptions.DefaultSampleName, showRuntimeSettings = workspaceOptions.ShowRuntimeSettings, credentials = workspaceOptions.Credentials }));</script>
+    <script src="~/_content/TXTextControl.AI.AspNetCore/client.js" asp-append-version="true"></script>
+    <script src="~/_content/TXTextControl.AI.AspNetCore/editor.js" asp-append-version="true"></script>
+    <script src="~/js/knowledge.js" asp-append-version="true"></script>
+    <script src="~/js/app.js" asp-append-version="true"></script>
+    <script src="~/js/runtime-admin.js" asp-append-version="true"></script>
+    <script src="~/js/connection-admin.js" asp-append-version="true"></script>
+</body>
+</html>
