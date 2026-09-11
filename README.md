@@ -2,8 +2,6 @@
 
 Build document-aware AI applications with the TX Text Control AI and MCP NuGet packages. This repository contains application source only: the reusable libraries and document engine are consumed as packages. No private library repository, signing key, or package-building step is required.
 
-> **Preview / release preparation:** the pinned AI/MCP package versions must be published before a clean public restore can succeed. The current candidate also has a known transitive SQLite advisory; see [release readiness](docs/release-readiness.md). This checkout is not yet a cleared production release.
-
 ## Choose a sample
 
 | Sample | What you can build | Runs on |
