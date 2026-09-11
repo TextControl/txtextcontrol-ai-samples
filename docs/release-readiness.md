@@ -1,6 +1,12 @@
 # Release readiness
 
-This collection is prepared for package-only consumption. It does not build or publish library packages itself and requires no private signing key. All six library packages are pinned to `0.1.0-beta.1`, including the renamed `TXTextControl.AI.McpServer`. Its C# namespaces and assembly identity are unchanged.
+This collection is prepared for package-only consumption. It does not build or publish library packages itself and requires no private signing key. The five AI integration packages are pinned to `0.1.0-beta.2`; the independent `TXTextControl.AI.McpServer` remains `0.1.0-beta.1`. Its C# namespaces and assembly identity are unchanged. See [beta.2 upgrade notes](release-beta-2.md).
+
+## Beta 2 validation (2026-09-11)
+
+All five newly versioned packages passed strong-name signature, license, icon and README-content checks. All 59 ASP.NET integration tests passed. Using the git-ignored local feed with the public beta.2 version pins, all ten samples built without warnings and the Web, AI.Service and MCP publish-output checks passed with `-ReleaseGate`. The full Web provider UI passed desktop and mobile browser checks against a fake local provider. No public NuGet publication or GitHub push was performed; the remaining gates below still apply.
+
+The Web sample's Luna profile explicitly disables reasoning for Chat Completions tool use. Real API keys must not be present in publishable JSON. The publication check rejects non-empty `ApiKey` fields; use local user secrets or deployment secret configuration instead.
 
 ## Unresolved release gates
 

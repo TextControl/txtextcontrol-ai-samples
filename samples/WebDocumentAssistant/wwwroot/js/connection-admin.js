@@ -14,8 +14,8 @@
     request().then(async result => {
         form.elements.serviceUrl.value = result.serviceUrl || "";
         status.textContent = result.remote
-            ? "Remote AI host: models, runtime installation, knowledge and exports are stored on that server."
-            : "Local AI host: models, runtimes, knowledge and exports are stored on the website server.";
+            ? "Remote integration host: local model files, runtimes, knowledge and exports are managed on that server. External inference is configured there separately."
+            : "Embedded integration host: local model files, runtimes, knowledge and exports are managed on the website server. External models stay at their provider.";
         if (result.remote) {
             const response = await fetch(window.textControlAIWorkspace.apiBaseUrl.replace(/\/$/, "") + "/host", { credentials: "same-origin" });
             if (response.ok) { const host = await response.json(); status.textContent += ` Model directory: ${host.modelDirectory}`; }

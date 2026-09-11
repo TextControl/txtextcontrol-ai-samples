@@ -108,13 +108,14 @@
                             <button class="new-chat-button" data-reset-chat type="button"><span aria-hidden="true">＋</span> New chat</button>
                         </div>
                     </div>
+                    <p class="inference-disclosure" data-inference-disclosure hidden></p>
                     <div class="messages" data-messages aria-live="polite">
                         <div class="agent-welcome">
                             <div class="welcome-mark">TX</div>
                             <h1>
                                 Your documents. Your AI. Your control. Let’s get to work.
                             </h1>
-                            <p>Create a document, attach one to ask questions, or request precise edits through your local document agent.</p>
+                            <p>Create a document, attach one to ask questions, or request precise edits through your document agent.</p>
                         </div>
                     </div>
                     <section class="quick-actions-panel chat-quick-actions">
@@ -206,7 +207,7 @@
         <section class="workspace" data-panel="runtime" hidden>
             <div class="runtime-layout">
                 <section class="settings-card glass-card">
-                    <div class="panel-header"><div><span class="eyebrow">ADMIN</span><h1>Runtime settings</h1><p>Connect the document server, select an application-owned GGUF, and tune generation behavior.</p></div></div>
+                    <div class="panel-header"><div><span class="eyebrow">ADMIN</span><h1>Runtime settings</h1><p>Connect the document server, choose local or external inference, and tune generation behavior.</p></div></div>
                     <form data-connection-form data-endpoint="@Url.Content("~/integration-connection")" class="runtime-installation">
                         <div><span class="eyebrow">AI HOST</span><h2>Integration service</h2></div>
                         <p>Use the AI engine in this website, or connect to a separately hosted AI service. The same Runtime and Knowledge screens manage the selected host.</p>
@@ -217,6 +218,13 @@
                         <button type="button" data-connection-test class="secondary-button">Test connection</button></div>
                     </form>
                     <form data-runtime-form>
+                        <div class="field full">
+                            <label for="inferenceProfile">Inference provider</label>
+                            <select id="inferenceProfile" name="inferenceProfile"><option value="Local">Local GGUF model</option></select>
+                            <small>Profiles, model IDs, limits and API keys are configured on the AI host. This setting is independent of the AI service URL.</small>
+                            <p data-inference-notice role="status"></p>
+                            <button type="button" class="secondary-button" data-test-inference hidden>Test provider (small API charge)</button>
+                        </div>
                         <section class="runtime-installation full" data-runtime-installation aria-label="Inference runtime installation">
                             <div><span class="eyebrow">INFERENCE ENGINE</span><h2>Runtime installation</h2></div>
                             <p data-install-summary>Checking installed runtimes…</p>
@@ -253,8 +261,8 @@
                             </div>
                             <small class="connection-result" data-mcp-test-result>Enter a Streamable HTTP MCP endpoint, then test it before applying.</small>
                         </div>
-                        <label class="toggle"><input name="enableMcp" type="checkbox" checked /><span></span><div><strong>TX Text Control Document MCP</strong><small>Turn off to load and use the local model without an MCP server.</small></div></label>
-                        <div class="field full"><label for="modelFile">Model</label><select id="modelFile" name="modelFile" required><option value="">No models found</option></select><small>Scanned from this web application’s Models directory.</small></div>
+                        <label class="toggle"><input name="enableMcp" type="checkbox" checked /><span></span><div><strong>TX Text Control Document MCP</strong><small>Turn off to use the selected model without MCP document tools.</small></div></label>
+                        <div class="field full"><label for="modelFile">Model</label><select id="modelFile" name="modelFile" required><option value="">No models found</option></select><small data-model-location>Local GGUF files are scanned on the AI host. External models run at the selected provider.</small></div>
                         <div class="field full range-field"><label for="temperature">Warmth <output data-temperature-output>0.60</output></label><input id="temperature" name="temperature" type="range" min="0" max="2" step="0.05" value="0.6" /><div class="range-labels"><span>Precise</span><span>Creative</span></div></div>
                         <div class="settings-grid">
                             <div class="field"><label for="hardwareBackend">Inference backend</label><select id="hardwareBackend" name="hardwareBackend"><option value="0">Auto (installed runtimes)</option><option value="1">CPU</option><option value="2">CUDA</option><option value="3">Vulkan</option></select></div>
@@ -286,7 +294,7 @@
                         <div><dt>MCP endpoint</dt><dd data-status-mcp-endpoint>—</dd></div>
                         <div><dt>MCP tools</dt><dd data-status-tools>0</dd></div>
                     </dl>
-                    <div class="privacy-note"><span>⌁</span><p><strong>Local processing</strong>Model inference stays on this machine. Knowledge references are indexed locally with TX Text Control. Working-document operations use the configured MCP server.</p></div>
+                    <div class="privacy-note"><span>⌁</span><p><strong>Processing location</strong><span data-processing-location>Inference runs on the configured AI host or provider. Document operations use MCP. Embedding configuration is independent.</span></p></div>
                 </aside>
             </div>
         </section>

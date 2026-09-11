@@ -1,10 +1,34 @@
 # TX Text Control AI
 
-Local generative AI for .NET applications built with TX Text Control.
+Local and optionally API-backed generative AI for .NET applications built with TX Text Control.
 `TXTextControl.AI` loads application-owned GGUF models and exposes them through
 `Microsoft.Extensions.AI.IChatClient`. Use it for chat, streaming, structured
 answers and model-assisted document workflows without making your application
 depend on a particular user interface.
+
+## OpenAI and compatible APIs
+
+Beta 2 adds the external-provider client while retaining the existing local APIs.
+For tool calls with `gpt-5.6-luna` over Chat Completions, explicitly set
+`ChatOptions.Reasoning = new ReasoningOptions { Effort = ReasoningEffort.None }`.
+Pass these options to both regular and streaming calls. Other models may support different
+efforts; leaving reasoning unset uses the provider default. In ASP.NET Core, configure the
+equivalent `LocalAI:InferenceProfiles` entry with `"ReasoningEffort": "None"`.
+
+Local GGUF inference remains the default. For remote API inference, use the additive
+`OpenAIChatClientFactory.Create(OpenAIChatClientOptions)` API. It returns a disposable
+`IChatClient` supporting regular and streaming responses. Required options are `Model`
+and a server-owned `ApiKey`; `Endpoint` defaults to `https://api.openai.com/v1` and
+`RequestTimeout` defaults to ten minutes. No model or native runtime is downloaded.
+Existing `LocalLanguageModel` APIs are unchanged.
+
+Use ASP.NET Core inference profiles for administration, server-only credentials,
+context limits and private-knowledge endpoint approval. The package includes
+`INFERENCE-PROVIDERS.md` with full configuration, C# examples, extension points,
+security requirements and API documentation. The same guide is available in the
+[sample collection](https://github.com/TextControl/txtextcontrol-ai-samples/blob/master/docs/inference-providers.md).
+External inference sends prompts and included document/reference text to the provider;
+local storage and embeddings do not prevent that transfer.
 
 ## Contents
 
@@ -619,6 +643,35 @@ public static class ModelPresets
 {
     /// <summary>Gets the initial Qwen3 8B Q4_K_M showcase preset.</summary>
     public static ModelPreset Qwen3EightBQ4Km { get; }
+}
+```
+
+### TXTextControl.AI.OpenAIChatClientFactory
+
+```csharp
+/// <summary>Creates standard chat clients for OpenAI and compatible Chat Completions APIs. No local runtime is loaded.</summary>
+public static class OpenAIChatClientFactory
+{
+    /// <summary>Creates a caller-owned client. The endpoint is the API base URL, including /v1 where required.</summary>
+    public static IChatClient Create(OpenAIChatClientOptions options);
+    /// <summary>Requires HTTPS, or HTTP on loopback for explicitly configured local compatible servers.</summary>
+    public static void ValidateEndpoint(Uri endpoint);
+}
+```
+
+### TXTextControl.AI.OpenAIChatClientOptions
+
+```csharp
+/// <summary>Server-owned OpenAI connection settings. Never serialize credentials into a browser response.</summary>
+public sealed class OpenAIChatClientOptions
+{
+    /// <summary>API base URL, not a chat/completions operation URL.</summary>
+    public Uri Endpoint { get; set; } = new("https://api.openai.com/v1");
+    /// <summary>Provider model identifier; no model is downloaded.</summary>
+    public string Model { get; set; } = "";
+    public string ApiKey { get; set; } = "";
+    /// <summary>Maximum duration of a provider HTTP request.</summary>
+    public TimeSpan RequestTimeout { get; set; } = TimeSpan.FromMinutes(10);
 }
 ```
 

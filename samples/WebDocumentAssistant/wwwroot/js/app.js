@@ -235,7 +235,7 @@
         avatar.textContent = role === "user" ? "YOU" : "TX";
         const content = document.createElement("div");
         const label = document.createElement("strong");
-        label.textContent = role === "user" ? "You" : "Local assistant";
+        label.textContent = role === "user" ? "You" : "AI assistant";
         const paragraph = role === "assistant" && !pending
             ? document.createElement("div")
             : document.createElement("p");
@@ -591,7 +591,7 @@
         ui.messages.innerHTML = "";
         const welcome = document.createElement("div");
         welcome.className = "agent-welcome";
-        welcome.innerHTML = '<div class="welcome-mark">TX</div><h1>What shall we make?</h1><p>Create a document, attach one to ask questions, or request precise edits through your local document agent.</p>';
+        welcome.innerHTML = '<div class="welcome-mark">TX</div><h1>What shall we make?</h1><p>Create a document, attach one to ask questions, or request precise edits through your document agent.</p>';
         ui.messages.append(welcome);
         renderChatCreationActions();
         showToast("Conversation cleared");
@@ -600,6 +600,13 @@
     const refreshRuntime = async (hydrateForm = false) => {
         runtime = await api("/api/runtime");
         const ready = runtime.state === "ready";
+        const externalInference = runtime.configuration?.inferenceProfile && runtime.configuration.inferenceProfile !== "Local";
+        const disclosure = document.querySelector("[data-inference-disclosure]");
+        disclosure.hidden = !externalInference;
+        disclosure.textContent = externalInference ? `External inference: ${runtime.configuration.inferenceProfile}. Prompts and included document/reference text are sent to the configured provider.` : "";
+        document.querySelector("[data-processing-location]").textContent = externalInference
+            ? "Inference uses the selected external provider. Prompts, included document text and tool results leave the AI host. Indexing and embeddings remain on their separately configured hosts."
+            : "Inference uses the local/llama-server configuration on the AI host, which may be separate from this website. Document conversion and editing use MCP.";
         ui.runtimePill.dataset.state = runtime.state;
         ui.runtimeShort.textContent = ready ? `${runtime.hardware || "Local"} · ready` : runtime.state === "loading" ? "Loading model" : "Runtime offline";
         ui.modelLabel.textContent = runtime.model || "No model loaded";
@@ -607,8 +614,8 @@
         ui.statusOrb.dataset.state = runtime.state;
         ui.statusHeading.textContent = ready ? "Runtime ready" : runtime.state === "loading" ? "Loading model…" : "Runtime offline";
         ui.statusDetail.textContent = runtime.error || (ready
-            ? runtime.configuration?.enableMcp ? "The model and document toolchain are available." : "The local model is ready; MCP document tools are disabled."
-            : "Place a GGUF in Models and load it.");
+            ? runtime.configuration?.enableMcp ? "The model and document toolchain are available." : "The model is ready; MCP document tools are disabled."
+            : runtime.configuration?.inferenceProfile && runtime.configuration.inferenceProfile !== "Local" ? "Apply the configured provider to enable inference." : "Place a GGUF in Models and load it.");
         ui.statusModel.textContent = runtime.model || "—";
         ui.statusEngine.textContent = runtime.runtime || "—";
         ui.statusHardware.textContent = runtime.hardware || "—";
@@ -628,19 +635,56 @@
         ui.temperatureOutput.textContent = Number(config.temperature).toFixed(2);
     };
 
-    const loadModels = async () => {
-        const models = await api("/api/models");
+    let inferenceProfiles = [], localModels = [];
+    const profileSelect = ui.runtimeForm.elements.inferenceProfile;
+    const testInference = document.querySelector("[data-test-inference]");
+    const showInferenceProfile = (changed = false) => {
+        const profile = inferenceProfiles.find(p => p.name === profileSelect.value);
+        const remote = Boolean(profile && profile.name !== "Local");
+        const models = remote ? [{ fileName: profile.model, displayName: profile.model, sizeInBytes: 0 }] : localModels;
         ui.modelSelect.innerHTML = "";
         if (!models.length) {
             ui.modelSelect.add(new Option("No GGUF files found in Models", ""));
-            return;
         }
         models.forEach(model => {
             const size = (model.sizeInBytes / 1024 ** 3).toFixed(2);
-            ui.modelSelect.add(new Option(`${model.displayName} · ${size} GB`, model.fileName));
+            ui.modelSelect.add(new Option(remote ? model.displayName : `${model.displayName} · ${size} GB`, model.fileName));
         });
-        if (runtime?.configuration?.modelFile) ui.modelSelect.value = runtime.configuration.modelFile;
+        if (!changed && runtime?.configuration?.modelFile) ui.modelSelect.value = runtime.configuration.modelFile;
+        document.querySelector("[data-runtime-installation]").hidden = remote;
+        for (const name of ["hardwareBackend", "gpuLayers", "threads", "flashAttention", "topK", "enableReasoning"]) {
+            const field = ui.runtimeForm.elements.namedItem(name);
+            field.closest(".field, .toggle").hidden = remote;
+        }
+        for (const name of ["temperature", "topP", "frequencyPenalty", "presencePenalty", "seed"])
+            ui.runtimeForm.elements.namedItem(name).closest(".field").hidden = remote && !profile.sendSamplingParameters;
+        testInference.hidden = !remote;
+        document.querySelector("[data-inference-notice]").textContent = remote
+            ? `${profile.provider} · ${profile.endpoint}. Prompts, included document text and tool results are sent to this provider. Private reference knowledge requires explicit TrustedInferenceEndpoints approval. No automatic local fallback.`
+            : "Inference runs on the configured local runtime. To add OpenAI, configure LocalAI:InferenceProfiles on the AI host and restart it.";
+        if (changed && profile) {
+            ui.runtimeForm.elements.contextSize.value = profile.contextSize;
+            ui.runtimeForm.elements.maxOutputTokens.value = Math.min(1024, profile.maxOutputTokens);
+            if (remote && !profile.supportsTools) ui.runtimeForm.elements.enableMcp.checked = false;
+        }
+        ui.runtimeForm.elements.contextSize.max = remote ? profile.contextSize : "";
+        ui.runtimeForm.elements.maxOutputTokens.max = remote ? profile.maxOutputTokens : 8192;
     };
+    const loadModels = async () => {
+        [localModels, inferenceProfiles] = await Promise.all([api("/api/models"), api("/api/inference/profiles")]);
+        profileSelect.replaceChildren(...inferenceProfiles.map(p => new Option(p.name === "Local" ? "Local GGUF model" : `${p.name} · ${p.provider}`, p.name)));
+        profileSelect.value = runtime?.configuration?.inferenceProfile || "Local";
+        showInferenceProfile();
+    };
+    profileSelect.addEventListener("change", () => showInferenceProfile(true));
+    testInference.addEventListener("click", async () => {
+        testInference.disabled = true;
+        try {
+            const result = await api("/api/inference/test", { method: "POST", body: JSON.stringify({ inferenceProfile: profileSelect.value }) });
+            showToast(result.message);
+        } catch (error) { showToast(error.message, true); }
+        finally { testInference.disabled = false; }
+    });
 
     const nullableNumber = value => value === "" ? null : Number(value);
     const nullableBoolean = value => value === "" ? null : value === "true";
@@ -680,6 +724,7 @@
         const button = ui.runtimeForm.querySelector("button[type='submit']");
         const original = button.textContent;
         const request = {
+            inferenceProfile: data.get("inferenceProfile") || "Local",
             modelFile: data.get("modelFile"),
             mcpEndpoint: data.get("mcpEndpoint"),
             enableMcp: data.get("enableMcp") === "on",

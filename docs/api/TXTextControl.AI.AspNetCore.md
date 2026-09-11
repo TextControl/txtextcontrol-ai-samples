@@ -5,6 +5,50 @@ HTTP workflows and browser SDKs. This package supplies chat, document assistance
 streaming, exports, runtime administration, optional private Knowledge and a
 secure server-to-server integration pattern.
 
+## Inference providers: local, OpenAI and custom
+
+`WebAiOptions.InferenceProfile` defaults to `Local`. Add host-owned profiles through
+`InferenceProfiles` to enable OpenAI or an OpenAI-compatible Chat Completions API.
+Each profile defines `Name`, `Provider`, `Endpoint`, `Model`, server-only `ApiKey`,
+`ContextSize`, `MaxOutputTokens`, `SupportsTools`, `SendSamplingParameters` and optional `ReasoningEffort`.
+The browser selects only a profile name; it cannot supply a destination or API key.
+Existing chat/document/streaming endpoints and editor bindings are unchanged.
+
+### Beta 2: reasoning and document tools
+
+For `gpt-5.6-luna` through the built-in Chat Completions provider, set
+`"ReasoningEffort": "None"` in that host-owned profile. Otherwise, text-only requests
+can work while document creation or editing fails with HTTP 400. The provider requires
+reasoning disabled for this combination; this setting does not disable document tools.
+Omit the setting for the provider default, or choose `Low`, `Medium`, `High`, or
+`ExtraHigh` when supported by the model. Restart the AI host after changing configuration.
+This is separate from the local GGUF model's reasoning switch.
+
+Configure `Model` and `ApiKey` on the AI host, not in browser JavaScript. JSON settings
+are supported for local testing, but use user secrets, environment variables, or a secret
+store for credentials and never commit real keys. The supplied example JSON is a template,
+not an automatically loaded configuration file. Update both the Web and AI.Service package
+references when using a separately hosted integration service.
+
+Administration adds `GET /api/inference/profiles` and `POST /api/inference/test`.
+The test accepts `{ "inferenceProfile": "OpenAI" }` and sends a small billable prompt,
+without documents/tools. Existing runtime configuration accepts an additive
+`InferenceProfile` property (JSON `inferenceProfile`, default `Local`).
+The JavaScript client provides `inferenceProfiles(options)` and
+`testInferenceProfile(name, options)` with the existing request/cancellation options.
+
+Register `IInferenceChatClientFactory` implementations for other API protocols;
+the built-in `OpenAIInferenceChatClientFactory` supports `OpenAI` and
+`OpenAICompatible`. Clients returned by factories are owned/disposed by the integration.
+Local inference remains available without configuration changes. Embedding
+configuration is independent. Private RAG passages require explicit
+`TrustedInferenceEndpoints` approval for the active external endpoint.
+
+The package includes **INFERENCE-PROVIDERS.md** with every profile setting, host
+setup, direct C# usage, custom factory example, data-flow disclosure and security
+guidance. Also see the
+[public sample guide](https://github.com/TextControl/txtextcontrol-ai-samples/blob/master/docs/inference-providers.md).
+
 **Your application owns its pages, layout, sign-in experience and editor.**
 No sample pages, CSS framework, complete admin UI or Document Editor license are
 included. The MCP document server remains independently deployable.
@@ -733,6 +777,51 @@ public sealed class DocumentSampleCatalog(IWebHostEnvironment environment)
 public sealed record DocumentSummary(string Overview, IReadOnlyList<string> KeyPoints);
 ```
 
+### TXTextControl.AI.AspNetCore.IInferenceChatClientFactory
+
+```csharp
+/// <summary>Extension point for additional APIs. Return a new client whose lifetime is owned by the integration.</summary>
+public interface IInferenceChatClientFactory
+{
+    bool CanCreate(string provider);
+    IChatClient Create(InferenceProfile profile, TimeSpan requestTimeout);
+}
+```
+
+### TXTextControl.AI.AspNetCore.InferenceProfile
+
+```csharp
+/// <summary>A host-approved inference destination. Browser requests select only its name.</summary>
+public sealed class InferenceProfile
+{
+    public string Name { get; set; } = "";
+    public string Provider { get; set; } = "OpenAI";
+    public Uri Endpoint { get; set; } = new("https://api.openai.com/v1");
+    public string Model { get; set; } = "";
+    public string ApiKey { get; set; } = "";
+    public int ContextSize { get; set; } = 32_768;
+    public int MaxOutputTokens { get; set; } = 4_096;
+    public bool SupportsTools { get; set; } = true;
+    /// <summary>False by default: omit sampling controls for models that reject them.</summary>
+    public bool SendSamplingParameters { get; set; }
+    /// <summary>Optional provider reasoning effort. Null keeps the provider default; None explicitly disables reasoning.</summary>
+    public ReasoningEffort? ReasoningEffort { get; set; }
+}
+```
+
+### TXTextControl.AI.AspNetCore.InferenceProfileInfo
+
+```csharp
+/// <summary>Credential-free browser metadata. Local profiles have no API endpoint or fixed model.</summary>
+public sealed record InferenceProfileInfo(string Name, string Provider, string? Endpoint, string? Model, int ContextSize, int MaxOutputTokens, bool SupportsTools, bool SendSamplingParameters);
+```
+
+### TXTextControl.AI.AspNetCore.InferenceProfileTestRequest
+
+```csharp
+public sealed record InferenceProfileTestRequest(string InferenceProfile);
+```
+
 ### TXTextControl.AI.AspNetCore.InstallRuntimeRequest
 
 ```csharp
@@ -839,8 +928,12 @@ public sealed partial class LocalAiWarmupService(LocalDocumentAiService ai, IOpt
 public sealed partial class LocalDocumentAiService : IAsyncDisposable
 {
     public LocalDocumentAiService(IWebHostEnvironment environment, IOptions<WebAiOptions> configuredOptions, ILogger<LocalDocumentAiService> logger);
+    public LocalDocumentAiService(IWebHostEnvironment environment, IOptions<WebAiOptions> configuredOptions, ILogger<LocalDocumentAiService> logger, IEnumerable<IInferenceChatClientFactory> inferenceFactories);
     public RuntimeStatus Status { get; }
 
+    /// <summary>Runs a small billable prompt, without documents or MCP tools, and does not change the active profile.</summary>
+    public async Task TestInferenceProfileAsync(string profileName, CancellationToken cancellationToken = default);
+    public IReadOnlyList<InferenceProfileInfo> GetInferenceProfiles();
     public IReadOnlyList<ModelChoice> GetModels();
     public async Task InitializeAsync(CancellationToken cancellationToken = default);
     public async Task<RuntimeStatus> ConfigureAsync(RuntimeConfigurationRequest requested, CancellationToken cancellationToken = default);
@@ -898,6 +991,16 @@ public sealed class McpKnowledgeDocumentExtractor(HttpClient http, Func<Uri> end
 
 ```csharp
 public sealed record ModelChoice(string FileName, string DisplayName, long SizeInBytes);
+```
+
+### TXTextControl.AI.AspNetCore.OpenAIInferenceChatClientFactory
+
+```csharp
+public sealed class OpenAIInferenceChatClientFactory : IInferenceChatClientFactory
+{
+    public bool CanCreate(string provider);
+    public IChatClient Create(InferenceProfile profile, TimeSpan requestTimeout);
+}
 ```
 
 ### TXTextControl.AI.AspNetCore.RemoteIntegrationConnection
@@ -991,7 +1094,10 @@ public static class RuntimeAdministrationEndpoints
 ### TXTextControl.AI.AspNetCore.RuntimeConfigurationRequest
 
 ```csharp
-public sealed record RuntimeConfigurationRequest(string ModelFile, string McpEndpoint, bool EnableMcp, int ContextSize, int GpuLayers, int? Threads, bool? FlashAttention, bool EnableReasoning, int MaxOutputTokens, float Temperature, int TopK, float TopP, float? FrequencyPenalty, float? PresencePenalty, int? Seed, HardwareBackend HardwareBackend = HardwareBackend.Auto);
+public sealed record RuntimeConfigurationRequest(string ModelFile, string McpEndpoint, bool EnableMcp, int ContextSize, int GpuLayers, int? Threads, bool? FlashAttention, bool EnableReasoning, int MaxOutputTokens, float Temperature, int TopK, float TopP, float? FrequencyPenalty, float? PresencePenalty, int? Seed, HardwareBackend HardwareBackend = HardwareBackend.Auto)
+{
+    public string InferenceProfile { get; init; } = "Local";
+}
 ```
 
 ### TXTextControl.AI.AspNetCore.RuntimeInstallationService
@@ -1047,6 +1153,7 @@ public static class TrustedProcessingEndpoints
 {
     public static bool IsTrusted(Uri endpoint, IEnumerable<string> allowed);
     public static void ValidateKnowledge(WebAiOptions settings, bool enableMcp, Uri mcpEndpoint);
+    public static void ValidateKnowledge(WebAiOptions settings, bool enableMcp, Uri mcpEndpoint, string profileName);
 }
 ```
 
@@ -1056,6 +1163,10 @@ public static class TrustedProcessingEndpoints
 public sealed class WebAiOptions
 {
     public const string SectionName = "LocalAI";
+    /// <summary>Default host-approved profile. Local preserves the existing GGUF workflow.</summary>
+    public string InferenceProfile { get; set; } = "Local";
+    /// <summary>Named external inference profiles. URLs and credentials are configured only on the AI host.</summary>
+    public InferenceProfile[] InferenceProfiles { get; set; } = [];
     public bool WarmupOnStartup { get; set; } = true;
     public bool AutoInstallRuntime { get; set; }
     public long MaximumExportBytes { get; set; } = 128L * 1024 * 1024;
@@ -1108,6 +1219,7 @@ declare namespace TXTextControlAI {
         headers?: HeadersInit | (() => HeadersInit | Promise<HeadersInit>);
     }
     interface RequestOptions extends RequestInit { }
+    interface InferenceProfileInfo { name: string; provider: string; endpoint: string | null; model: string | null; contextSize: number; maxOutputTokens: number; supportsTools: boolean; sendSamplingParameters: boolean; }
     interface ChatAttachment { fileName: string; data: string; }
     interface ChatOptions extends RequestOptions { attachment?: ChatAttachment; knowledge?: KnowledgeScope | null; }
     interface KnowledgeScope { collectionId: string; allowDocumentChanges?: boolean; sourceVersionId?: string | null; }
@@ -1181,6 +1293,8 @@ declare namespace TXTextControlAI {
         resetChat(options?: RequestOptions): Promise<unknown>;
         exportAnswer(request: { mode: "chat" | "document"; answerId: string; format: string }, options?: RequestOptions): Promise<unknown>;
         runtimeInstallation(options?: RequestOptions): Promise<unknown>;
+        inferenceProfiles(options?: RequestOptions): Promise<InferenceProfileInfo[]>;
+        testInferenceProfile(name: string, options?: RequestOptions): Promise<unknown>;
         runtimeAdmin(action: string, payload?: unknown, options?: RequestOptions): Promise<unknown>;
         installRuntime(backend?: "Auto" | "Cpu" | "Cuda" | "Vulkan", options?: RequestOptions): Promise<unknown>;
         configureRuntimeDownload(download: RuntimeDownload, options?: RequestOptions): Promise<unknown>;

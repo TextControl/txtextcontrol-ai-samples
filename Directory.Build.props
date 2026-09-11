@@ -1,4 +1,6 @@
 <Project>
+  <!-- Optional, git-ignored local package testing. Published samples keep using NuGet.Config. -->
+  <Import Project="$(MSBuildThisFileDirectory).codex-build/Directory.Build.local.props" Condition="Exists('$(MSBuildThisFileDirectory).codex-build/Directory.Build.local.props')" />
   <PropertyGroup>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>

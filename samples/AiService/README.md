@@ -1,5 +1,31 @@
 # TX Text Control AI service sample
 
+Optional OpenAI and compatible inference providers are configured on the AI host.
+
+### Beta 2: OpenAI document workflows
+
+Use the beta.2 AI integration packages on both the website and any separate AI.Service.
+For `gpt-5.6-luna`, add `"ReasoningEffort": "None"` to its `LocalAI:InferenceProfiles`
+entry when using the built-in Chat Completions provider. This enables the supported
+tool-calling configuration for document creation and edits; it leaves document tools enabled.
+Without it, a plain-text request may succeed while a tool-enabled request returns HTTP 400.
+Other models retain their default reasoning behavior unless explicitly configured.
+
+Restart the process that owns inference after changing the profile: the Web application
+for in-process inference, or AI.Service when using `RemoteIntegration`. Select the profile
+in Runtime and apply it. The sample's local GGUF reasoning switch is independent.
+The example JSON is not loaded automatically; merge its non-secret settings into
+`appsettings.json` and configure credentials using user secrets or environment variables.
+
+See [the provider setup guide](../../docs/inference-providers.md) for secrets,
+profile selection, connection tests, limits and private-data approval. Update the
+AI host packages and website assets together; older builds lack these endpoints.
+
+For testing, merge [appsettings.OpenAI.example.json](appsettings.OpenAI.example.json)
+into your appsettings file and fill in Model and ApiKey. Alternatively, leave ApiKey
+empty and set it using user secrets or an environment variable. The example is not
+loaded automatically. Never commit or publish a settings file containing a real key.
+
 This is the original `TXTextControl.AI.Service.csproj` under the `AiService` sample folder. Install .NET 10 SDK plus ASP.NET Core 8 runtime. It consumes the same NuGet integration package as the full web application and retains runtime administration, remote chat/document workflows, streaming, downloads and Knowledge.
 
 Independently hosts inference, AI/MCP workflows, downloads, runtime administration

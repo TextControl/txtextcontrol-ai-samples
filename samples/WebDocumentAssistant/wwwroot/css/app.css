@@ -338,3 +338,7 @@ button:disabled { cursor: wait; opacity: .55; }
     .document-grid { grid-template-columns: minmax(0, 1fr); }
     .studio-agent { min-height: 700px; }
 }
+
+/* Provider-specific settings must stay hidden even when their layout uses flex/grid. */
+[data-runtime-form] [hidden], .inference-disclosure[hidden] { display: none !important; }
+.inference-disclosure { margin: 0; padding: 10px 24px; background: #fff1f8; color: #7d2159; font-size: 13px; flex: 0 0 auto; }

@@ -18,8 +18,22 @@ foreach ($project in $projects) {
     if ($xml.SelectNodes('//PackageReference[@Version or @VersionOverride or @Condition]').Count) { throw "Use centrally pinned, unconditional package references: $($project.Name)." }
     if (!(Test-Path -LiteralPath (Join-Path $project.DirectoryName README.md))) { throw "Missing sample README: $($project.Name)." }
 }
+function Test-NoEmbeddedApiKey($node, [string]$file) {
+    if ($null -eq $node) { return }
+    if ($node -is [System.Collections.IDictionary]) {
+        foreach ($key in $node.Keys) {
+            if ($key -eq 'ApiKey' -and ![string]::IsNullOrWhiteSpace([string]$node[$key])) {
+                throw "Non-empty ApiKey in publishable JSON: $file. Use user secrets or an environment variable."
+            }
+            Test-NoEmbeddedApiKey $node[$key] $file
+        }
+    } elseif ($node -is [System.Collections.IEnumerable] -and $node -isnot [string]) {
+        foreach ($item in $node) { Test-NoEmbeddedApiKey $item $file }
+    }
+}
 foreach ($file in $files | Where-Object { $_ -like '*.json' }) {
-    Get-Content -LiteralPath (Join-Path $repo $file) -Raw | ConvertFrom-Json | Out-Null
+    $json = Get-Content -LiteralPath (Join-Path $repo $file) -Raw | ConvertFrom-Json -AsHashtable
+    Test-NoEmbeddedApiKey $json $file
 }
 foreach ($file in $files | Where-Object { $_ -like '*.md' }) {
     $path = Join-Path $repo $file

@@ -21,6 +21,10 @@ Build document-aware AI applications with the TX Text Control AI and MCP NuGet p
 
 ## Start here
 
+This revision uses the beta.2 AI integration packages and beta.1 MCP server.
+See [beta.2 release and upgrade notes](docs/release-beta-2.md) for OpenAI profiles,
+reasoning/tool compatibility and package availability requirements.
+
 1. Install a stable **.NET 10 SDK** to build the collection. Install the **.NET 8 / ASP.NET Core 8 runtimes** to run AI samples; MCP targets .NET 10. SDK 8 includes the required .NET 8 runtimes.
 2. Review the [license](LICENSE.txt), TX Text Control licensing requirements and [third-party notices](THIRD-PARTY-NOTICES.md).
 3. Follow [getting started](docs/getting-started.md). Supply your own licensed GGUF model and compatible inference runtime. Model weights and runtimes are not included or downloaded by NuGet restore.
