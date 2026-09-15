@@ -1,6 +1,10 @@
 # Release readiness
 
-This collection is prepared for package-only consumption. It does not build or publish library packages itself and requires no private signing key. The five AI integration packages are pinned to `0.1.0-beta.2`; the independent `TXTextControl.AI.McpServer` remains `0.1.0-beta.1`. Its C# namespaces and assembly identity are unchanged. See [beta.2 upgrade notes](release-beta-2.md).
+This collection is prepared for package-only consumption. It does not build or publish library packages itself and requires no private signing key. All five AI integration packages and `TXTextControl.AI.McpServer` are pinned to `0.1.0-beta.3`. Its C# namespaces and assembly identity are unchanged. See [beta.3 upgrade notes](release-beta-3.md).
+
+## Beta 3 validation (2026-09-15)
+
+All ten sample builds, three publish-output checks, both MCP host smoke tests and three browser viewport regressions passed against the rebuilt local beta.3 packages. See [beta.3 validation details](release-beta-3.md#validated-on-windows-2026-09-15) for test scope and package-source details. Public package availability remains a separate release gate.
 
 ## Beta 2 validation (2026-09-11)
 

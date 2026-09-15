@@ -2,9 +2,9 @@
 
 Optional OpenAI and compatible inference providers are configured on the AI host.
 
-### Beta 2: OpenAI document workflows
+### Beta 3: OpenAI document workflows
 
-Use the beta.2 AI integration packages on both the website and any separate AI.Service.
+Use the beta.3 AI integration packages on both the website and any separate AI.Service.
 For `gpt-5.6-luna`, add `"ReasoningEffort": "None"` to its `LocalAI:InferenceProfiles`
 entry when using the built-in Chat Completions provider. This enables the supported
 tool-calling configuration for document creation and edits; it leaves document tools enabled.

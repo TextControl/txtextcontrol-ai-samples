@@ -4,7 +4,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
-    <McpPackageVersion Condition="'$(McpPackageVersion)' == ''">0.1.0-beta.1</McpPackageVersion>
+    <McpPackageVersion Condition="'$(McpPackageVersion)' == ''">0.1.0-beta.3</McpPackageVersion>
   </PropertyGroup>
   <ItemGroup>
   </ItemGroup>
